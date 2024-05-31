@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="darknet-master">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/darknet-master.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
