@@ -2,13 +2,13 @@ import cv2
 import numpy as np
 import time
 
-config_file = 'E:/ProPainter-main/ssd_mobilenet_v3_large_coco_2020_01_14.pbtxt'
-frozen_model = 'E:/ProPainter-main/frozen_inference_graph.pb'
+config_file = r'Task 3 - Video Inpainting Object Detection\ssd_mobilenet_v3_large_coco_2020_01_14.pbtxt'
+frozen_model = r'Task 3 - Video Inpainting Object Detection\frozen_inference_graph.pb'
 
 model = cv2.dnn_DetectionModel(frozen_model, config_file)
 
 classLabels = []
-file_name = 'E:/ProPainter-main/labels.txt'
+file_name = r'Task 3 - Video Inpainting Object Detection\labels.txt'
 with open(file_name, 'rt') as fpt:
     classLabels = fpt.read().rstrip('\n').split('\n')
 print(classLabels)
