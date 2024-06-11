@@ -41,7 +41,7 @@ class CameraApp:
 
     def create_widgets(self):
         try:
-            bg_image = Image.open('Task 6 - GUI and database integration\AI.jpg')
+            bg_image = Image.open('Task 6 - GUI and database integration/AI.jpg')
             bg_image = bg_image.resize((1200, 800), Image.LANCZOS)
             bg_photo = ImageTk.PhotoImage(bg_image)
 
@@ -96,16 +96,20 @@ class CameraApp:
                 self.before_canvas.create_image(0, 0, anchor='nw', image=imgtk)
                 self.before_canvas.image = imgtk
 
-            if self.privacy_mode and self.background is not None:
-                enhanced_frame = self.apply_privacy_enhancement(frame_flipped)
-                self.inpainting_done = True
-
-                if self.user_role == "Super Admin":
+            if self.user_role != "Admin":
+                if self.privacy_mode and self.background is not None:
+                    enhanced_frame = self.apply_privacy_enhancement(frame_flipped)
+                    self.inpainting_done = True
                     frame_rgb_enhanced = cv2.cvtColor(enhanced_frame, cv2.COLOR_BGR2RGB)
                     img_enhanced = Image.fromarray(frame_rgb_enhanced)
                     imgtk_enhanced = ImageTk.PhotoImage(image=img_enhanced)
                     self.after_canvas.create_image(0, 0, anchor='nw', image=imgtk_enhanced)
                     self.after_canvas.image = imgtk_enhanced
+                else:
+                    img = Image.fromarray(frame_rgb)
+                    imgtk = ImageTk.PhotoImage(image=img)
+                    self.after_canvas.create_image(0, 0, anchor='nw', image=imgtk)
+                    self.after_canvas.image = imgtk
 
         self.root.after(10, self.update_camera)
 
