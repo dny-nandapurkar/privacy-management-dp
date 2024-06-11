@@ -1,20 +1,3 @@
-import sqlite3
-
-def create_credentials_db():
-    conn = sqlite3.connect("credentials.db")
-    cursor = conn.cursor()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS super_admins (
-                      id INTEGER PRIMARY KEY,
-                      username TEXT UNIQUE,
-                      password TEXT)''')
-    # Add a default super admin for testing
-    cursor.execute("INSERT OR IGNORE INTO super_admins (username, password) VALUES (?, ?)",
-                   ("admin", "password"))
-    conn.commit()
-    conn.close()
-
-create_credentials_db()
-
 import cv2
 import numpy as np
 import time
@@ -24,6 +7,20 @@ from PIL import Image, ImageTk
 import sqlite3
 from datetime import datetime
 from ultralytics import YOLO
+
+def create_credentials_db():
+    conn = sqlite3.connect("credentials.db")
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS super_admins (
+                      id INTEGER PRIMARY KEY,
+                      username TEXT UNIQUE,
+                      password TEXT)''')
+    cursor.execute("INSERT OR IGNORE INTO super_admins (username, password) VALUES (?, ?)",
+                   ("admin", "password"))
+    conn.commit()
+    conn.close()
+
+create_credentials_db()
 
 class CameraApp:
     def __init__(self, root, database_name, user_role):
@@ -36,16 +33,15 @@ class CameraApp:
         self.background = None
         self.privacy_mode = False
         self.user_role = user_role
-
-        self.model = YOLO('yolov8m-seg.pt')
+        self.model = YOLO('yolov8n-seg.pt')
+        self.inpainting_done = False
 
         self.create_widgets()
         self.update_camera()
 
     def create_widgets(self):
-        # Set background image
         try:
-            bg_image = Image.open(r'Task 6 - GUI and database integration\AI.jpg')
+            bg_image = Image.open('Task 6 - GUI and database integration\AI.jpg')
             bg_image = bg_image.resize((1200, 800), Image.LANCZOS)
             bg_photo = ImageTk.PhotoImage(bg_image)
 
@@ -55,12 +51,10 @@ class CameraApp:
         except Exception as e:
             print(f"Error loading background image: {e}")
 
-        # Create main frame to hold image frames
         main_frame = tk.Frame(self.root, bg="#f7f5f2")
         main_frame.place(relx=0.5, rely=0.4, anchor="center")
 
         if self.user_role != "User":
-            # Create and place "before" frame
             self.before_frame = tk.Frame(main_frame, width=500, height=500, borderwidth=2, relief="solid", bg="#ffffff")
             self.before_frame.grid(row=0, column=0, padx=20, pady=10)
             self.before_canvas = tk.Canvas(self.before_frame, width=500, height=500)
@@ -69,7 +63,6 @@ class CameraApp:
             before_label.grid(row=1, column=0, pady=10)
 
         if self.user_role != "Admin":
-            # Create and place "after" frame
             self.after_frame = tk.Frame(main_frame, width=500, height=500, borderwidth=2, relief="solid", bg="#ffffff")
             self.after_frame.grid(row=0, column=1, padx=20, pady=10)
             self.after_canvas = tk.Canvas(self.after_frame, width=500, height=500)
@@ -77,7 +70,6 @@ class CameraApp:
             after_label = tk.Label(main_frame, text="After privacy enhancement", font=("Helvetica", 14), bg="#f7f5f2", fg="#a83232")
             after_label.grid(row=1, column=1, pady=10)
 
-        # Create and place buttons
         button_frame = tk.Frame(self.root, bg="#f7f5f2")
         button_frame.place(relx=0.5, rely=0.9, anchor="center")
 
@@ -99,27 +91,18 @@ class CameraApp:
             frame_rgb = cv2.cvtColor(frame_flipped, cv2.COLOR_BGR2RGB)
 
             if self.user_role != "User":
-                # Update "Before Privacy Enhancement" window
                 img = Image.fromarray(frame_rgb)
                 imgtk = ImageTk.PhotoImage(image=img)
                 self.before_canvas.create_image(0, 0, anchor='nw', image=imgtk)
                 self.before_canvas.image = imgtk
 
             if self.privacy_mode and self.background is not None:
-                # Apply privacy enhancement
                 enhanced_frame = self.apply_privacy_enhancement(frame_flipped)
+                self.inpainting_done = True
 
-                if self.user_role != "Admin":
-                    # Update "After Privacy Enhancement" window
-                    frame_rgb_enhanced = cv2.cvtcolor(enhanced_frame, cv2.COLOR_BGR2RGB)
+                if self.user_role == "Super Admin":
+                    frame_rgb_enhanced = cv2.cvtColor(enhanced_frame, cv2.COLOR_BGR2RGB)
                     img_enhanced = Image.fromarray(frame_rgb_enhanced)
-                    imgtk_enhanced = ImageTk.PhotoImage(image=img_enhanced)
-                    self.after_canvas.create_image(0, 0, anchor='nw', image=imgtk_enhanced)
-                    self.after_canvas.image = imgtk_enhanced
-            else:
-                if self.user_role != "Admin":
-                    # Update "After Privacy Enhancement" window with the original frame
-                    img_enhanced = Image.fromarray(frame_rgb)
                     imgtk_enhanced = ImageTk.PhotoImage(image=img_enhanced)
                     self.after_canvas.create_image(0, 0, anchor='nw', image=imgtk_enhanced)
                     self.after_canvas.image = imgtk_enhanced
@@ -142,21 +125,17 @@ class CameraApp:
     def apply_privacy_enhancement(self, frame):
         if frame is not None:
             results = self.model(frame)[0]
-
             if results.masks is not None:
                 masks = results.masks.data.cpu().numpy()
                 boxes = results.boxes.xyxy.cpu().numpy()
                 scores = results.boxes.conf.cpu().numpy()
                 classes = results.boxes.cls.cpu().numpy().astype(int)
-
-                # Create a mask for inpainting
                 mask = np.zeros_like(frame[:, :, 0])
 
                 for i in range(len(boxes)):
                     if classes[i] == 0 and scores[i] > 0.5:
                         mask[masks[i] > 0.5] = 255
 
-                # Inpaint the frame using the background
                 inpainted_frame = frame.copy()
                 inpainted_frame[mask == 255] = self.background[mask == 255]
                 return inpainted_frame
@@ -185,15 +164,20 @@ class CameraApp:
     def exit_app(self):
         self.capture.release()
         self.root.destroy()
+        self.root.quit()
+        root = tk.Tk()
+        database_name = "images.db"
+        app = RoleSelection(root)
+        root.mainloop()
 
 class RoleSelection:
     def __init__(self, root):
         self.root = root
         self.root.title("Role Selection")
-        self.root.geometry("300x200")
+        self.root.geometry("500x300")
 
         self.selected_role = StringVar(self.root)
-        self.selected_role.set("User")  # Default role
+        self.selected_role.set("User")
 
         roles = ["User", "Admin", "Super Admin"]
         role_menu = OptionMenu(self.root, self.selected_role, *roles, command=self.on_role_selected)
@@ -202,41 +186,44 @@ class RoleSelection:
         self.login_frame = None
 
         self.proceed_button = Button(self.root, text="Proceed", command=self.proceed)
-        self.proceed_button.pack(pady=20)
+        self.proceed_button.pack(pady=10)
 
-    def on_role_selected(self, value):
-        if value == "Super Admin":
-            self.show_login_prompt()
-        elif self.login_frame is not None:
-            self.login_frame.destroy()
-            self.login_frame = None
+    def on_role_selected(self, event):
+        role = self.selected_role.get()
+        if role == "Super Admin":
+            if self.login_frame is None:
+                self.login_frame = tk.Frame(self.root)
+                self.login_frame.pack(pady=10)
 
-    def show_login_prompt(self):
-        if self.login_frame is None:
-            self.login_frame = tk.Frame(self.root)
-            self.login_frame.pack(pady=10)
+                self.username_label = Label(self.login_frame, text="Username")
+                self.username_label.grid(row=0, column=0)
+                self.username_entry = Entry(self.login_frame)
+                self.username_entry.grid(row=0, column=1)
 
-            username_label = Label(self.login_frame, text="Username")
-            username_label.pack()
-            self.username_entry = Entry(self.login_frame)
-            self.username_entry.pack()
-
-            password_label = Label(self.login_frame, text="Password")
-            password_label.pack()
-            self.password_entry = Entry(self.login_frame, show="*")
-            self.password_entry.pack()
+                self.password_label = Label(self.login_frame, text="Password")
+                self.password_label.grid(row=1, column=0)
+                self.password_entry = Entry(self.login_frame, show="*")
+                self.password_entry.grid(row=1, column=1)
+            else:
+                self.login_frame.pack(pady=10)
+        else:
+            if self.login_frame:
+                self.login_frame.pack_forget()
 
     def proceed(self):
         role = self.selected_role.get()
         if role == "Super Admin":
             username = self.username_entry.get()
             password = self.password_entry.get()
-            if self.verify_credentials(username, password):
-                self.open_camera_app(role)
-            else:
-                messagebox.showerror("Error", "Invalid username or password!")
-        else:
-            self.open_camera_app(role)
+            if not self.verify_credentials(username, password):
+                messagebox.showerror("Error", "Invalid Super Admin credentials!")
+                return
+
+        self.root.destroy()
+        root = tk.Tk()
+        database_name = "images.db"
+        app = CameraApp(root, database_name, role)
+        root.mainloop()
 
     def verify_credentials(self, username, password):
         conn = sqlite3.connect("credentials.db")
@@ -246,15 +233,7 @@ class RoleSelection:
         conn.close()
         return result is not None
 
-    def open_camera_app(self, role):
-        self.root.destroy()
-        root = tk.Tk()
-        app = CameraApp(root, "image_database.db", role)
-        root.mainloop()
-
 if __name__ == "__main__":
-    create_credentials_db()  # Ensure the credentials database is created
-    role_selection = tk.Tk()
-    app = RoleSelection(role_selection)
-    role_selection.mainloop()
-
+    root = tk.Tk()
+    role_selection = RoleSelection(root)
+    root.mainloop()
