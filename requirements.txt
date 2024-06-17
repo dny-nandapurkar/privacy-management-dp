@@ -1,0 +1,10 @@
+numpy
+opencv-python
+time
+ultralytics
+matplotlib
+sqlite3
+datetime
+tkinter
+Pillow
+threading
